@@ -1,0 +1,11 @@
+{
+  "name": "heritage-mapping-demo",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Cultural Heritage Mapping System - static frontend + one serverless verification endpoint (Gemini + GPS + duplicate checks)",
+  "engines": { "node": ">=20" },
+  "scripts": { "dev": "node dev-server.js", "test": "node --test test/pipeline.test.js" },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

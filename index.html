@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cultural Heritage Mapping System — Live Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-text">
+    <p class="kicker">Field prototype</p>
+    <h1>Cultural Heritage Mapping System</h1>
+    <p class="dek">A record for sites that won't wait for us to get to them — captured on-site, screened on-device, checked by a person, then placed on the public map.</p>
+  </div>
+  <span id="netStatus" class="pill pending">checking connection…</span>
+</header>
+
+<div class="pipeline" id="pipeline" aria-label="Submission pipeline progress">
+  <div class="pipeline-track">
+    <div class="pipeline-fill" id="pipelineFill"></div>
+  </div>
+  <ol class="pipeline-steps">
+    <li class="step" data-step="capture">
+      <span class="step-dot"><span class="step-num">1</span><svg class="step-check" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></svg></span>
+      <span class="step-label">Capture</span>
+    </li>
+    <li class="step" data-step="screening">
+      <span class="step-dot"><span class="step-num">2</span><svg class="step-check" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></svg></span>
+      <span class="step-label">Screening</span>
+    </li>
+    <li class="step" data-step="review">
+      <span class="step-dot"><span class="step-num">3</span><svg class="step-check" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></svg></span>
+      <span class="step-label">Review</span>
+    </li>
+    <li class="step" data-step="map">
+      <span class="step-dot"><span class="step-num">4</span><svg class="step-check" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></svg></span>
+      <span class="step-label">Live map</span>
+    </li>
+  </ol>
+</div>
+
+<details class="how-it-works">
+  <summary>How this pipeline works</summary>
+  <div class="hiw-body">
+    <div class="hiw-row">
+      <h3>Capture</h3>
+      <p>A photo, a note, and a GPS fix — pulled straight from the browser's real location and camera APIs. The GPS fix must be precise enough to prove you are on site; there is no fallback coordinate.</p>
+      <span class="hiw-tag real">Working now</span>
+    </div>
+    <div class="hiw-row">
+      <h3>AI verification</h3>
+      <p>Gemini checks that the photo is sharp, shows a heritage structure and matches the title you gave; your GPS position is checked against the ASI register entry for that site; the photo is compared with photos already on record (duplicates are dropped, new views are kept); and notes that aren't about the site are left out.</p>
+      <span class="hiw-tag real">Working now</span>
+    </div>
+    <div class="hiw-row">
+      <h3>Moderation</h3>
+      <p>Verified submissions wait here for a person to approve or reject them before they reach the public archive, with the verification results shown alongside.</p>
+      <span class="hiw-tag real">Working now</span>
+    </div>
+    <div class="hiw-row">
+      <h3>Public map</h3>
+      <p>Approved sites only, plotted with Leaflet over OpenStreetMap tiles.</p>
+      <span class="hiw-tag real">Working now</span>
+    </div>
+    <p class="hiw-note">Not built yet: sign-in for moderators (approve/reject is currently open), and offline queuing — submitting needs a live connection because verification runs on a server.</p>
+  </div>
+</details>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="capture">Capture</button>
+  <button class="tab-btn" data-tab="admin">Moderation</button>
+  <button class="tab-btn" data-tab="map">Public map</button>
+</nav>
+
+<main>
+
+  <!-- CAPTURE TAB -->
+  <section id="capture" class="tab active">
+
+    <div class="stage" id="stageForm">
+      <div class="card">
+        <label for="siteName">Site name</label>
+        <input type="text" id="siteName" placeholder="e.g. Kuldhara Fort, Jaisalmer">
+
+        <label for="siteCategory">Site category</label>
+        <select id="siteCategory">
+          <option value="">Not specified</option>
+          <option value="Fort">Fort</option>
+          <option value="Temple">Temple</option>
+          <option value="Stepwell / Baoli">Stepwell / Baoli</option>
+          <option value="Monument / Tomb">Monument / Tomb</option>
+          <option value="Palace / Haveli">Palace / Haveli</option>
+          <option value="Other">Other</option>
+        </select>
+        <div class="status-line">Only applied if this site doesn't already have a category on record.</div>
+
+        <label for="siteNotes">Notes / description</label>
+        <textarea id="siteNotes" placeholder="What you observed on site..."></textarea>
+
+        <label for="photoInput">Photo</label>
+        <input type="file" id="photoInput" accept="image/*">
+        <img id="preview" alt="Selected site photo preview">
+
+        <label>Location</label>
+        <button type="button" class="btn-secondary" id="gpsBtn">Capture GPS</button>
+        <div class="status-line" id="gpsStatus">Not captured yet</div>
+
+        <label for="contributorName">Your name (optional)</label>
+        <input type="text" id="contributorName" placeholder="Credited as the contributor">
+
+        <button class="btn-primary" id="submitBtn">Verify &amp; submit</button>
+        <div class="status-line" id="formError" role="alert"></div>
+      </div>
+    </div>
+
+    <div class="stage" id="stageScreening" hidden>
+      <div class="card stage-center">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="screening-label">Verifying your submission…</p>
+        <p class="screening-sub" id="screeningSub">Checking the photo on your device</p>
+      </div>
+    </div>
+
+    <div class="stage" id="stageResult" hidden>
+      <div class="card result-card">
+        <div class="result-photo">
+          <img id="resultPhoto" alt="">
+        </div>
+        <div class="result-body">
+          <span class="result-label" id="resultLabel"></span>
+          <p class="result-confidence" id="resultConfidence"></p>
+          <p class="result-source" id="resultSource"></p>
+          <p class="result-flag" id="resultFlag" hidden>⚠ Flagged for quality — a moderator will take a closer look.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage" id="stageSuccess" hidden>
+      <div class="card stage-center">
+        <div class="check-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 13l5 5L20 7"/></svg>
+        </div>
+        <p class="success-title" id="successTitle">Sent to the moderation queue</p>
+        <p class="success-sub" id="successSub"></p>
+        <ul class="check-list" id="successChecks" aria-label="Verification checks"></ul>
+        <div class="success-actions">
+          <button class="btn-secondary" id="addAnotherBtn">Add another site</button>
+          <button class="btn-primary" id="viewModerationBtn">View in moderation</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage" id="stageRejected" hidden>
+      <div class="card stage-center">
+        <div class="reject-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </div>
+        <p class="success-title" id="rejectedTitle"></p>
+        <p class="success-sub" id="rejectedMessage" role="alert"></p>
+        <ul class="check-list" id="rejectedChecks" aria-label="Verification checks"></ul>
+        <p class="status-line">Nothing was saved. Your entries are still in the form.</p>
+        <div class="success-actions">
+          <button class="btn-primary" id="retryBtn" style="margin-top:0;width:auto;">Fix and try again</button>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- MODERATION TAB -->
+  <section id="admin" class="tab">
+    <p class="section-note">Every submission lands here first. Approving pushes it to the public map; rejecting discards it.</p>
+    <div id="adminList"></div>
+    <div class="toast" id="approveToast" hidden>
+      <span id="approveToastText"></span>
+      <button class="btn-link" id="toastViewMap">View on map</button>
+      <button class="btn-link" id="toastDismiss">Dismiss</button>
+    </div>
+  </section>
+
+  <!-- MAP TAB -->
+  <section id="map" class="tab">
+    <p class="section-note">Public heritage archive — only approved, AI-screened submissions appear here.</p>
+    <div class="meta-pills" id="mapLegend">
+      <span class="meta-pill" style="background:#F1E3D6;color:#8B4A2B;">Fort</span>
+      <span class="meta-pill" style="background:#FBF0D9;color:#B8860B;">Temple</span>
+      <span class="meta-pill" style="background:#E4F3EA;color:#2E7D4F;">Stepwell / Baoli</span>
+      <span class="meta-pill muted">Monument / Tomb</span>
+      <span class="meta-pill" style="background:#FAE6E2;color:#A8402E;">Palace / Haveli</span>
+    </div>
+    <div id="map-container"><div id="map"></div></div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>Built by</p>
+  <ul class="credits">
+    <li><a href="https://github.com/satvikmegh21-source" target="_blank" rel="noopener">satvikmegh21-source</a></li>
+    <li><a href="https://github.com/Mr-Fool-0" target="_blank" rel="noopener">Mr-Fool-0</a></li>
+    <li><a href="https://github.com/DilucAckerman" target="_blank" rel="noopener">DilucAckerman</a></li>
+  </ul>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
